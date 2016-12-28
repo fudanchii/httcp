@@ -1,0 +1,9 @@
+[package]
+name = "httcp"
+version = "0.1.0"
+authors = ["Nurahmadie <nurahmadie@gmail.com>"]
+
+[dependencies]
+clap = "2.19.2"
+rocket = "0.1.2"
+rocket_codegen = "0.1.2"
