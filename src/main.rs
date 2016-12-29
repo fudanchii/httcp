@@ -4,35 +4,19 @@
 #[macro_use]
 extern crate clap;
 
+#[macro_use]
+extern crate lazy_static;
+
 extern crate rocket;
 
-use rocket::config::{Config, Environment};
+use rocket::config::{Config, ConfigError, Environment};
 
 static DEFPORT: usize = 32223;
 static DEFBIND: &'static str = "127.0.0.1:32223";
 static DEFTTCP: &'static str = "127.0.0.1:22222";
 
-#[get("/")]
-fn proxify() -> &'static str {
-    "test\n"
-}
-
-fn run_server(b: &str, t: &str) -> Result<(), HttcpError> {
-    let bv: Vec<&str> = b.split(":").collect();
-    let addr = bv[0].to_owned();
-    let port = bv[1].parse::<usize>().unwrap_or(DEFPORT);
-
-    let config = Config::default_for(Environment::active()?, "custom")?
-                       .address(addr)
-                       .port(port);
-
-    rocket::custom(&config).mount("/", routes![proxify]).launch();
-
-    Ok(())
-}
-
-fn main() {
-    let matches = clap_app!(app =>
+lazy_static! {
+    static ref M: clap::ArgMatches<'static> = clap_app!(Httcp =>
         (version: "0.1.0")
         (author: "Nurahmadie <nurahmadie@gmail.com>")
         (about: "Proxy TCP server with http frontend")
@@ -40,8 +24,31 @@ fn main() {
         (@arg tcp: -t --tcpserver +takes_value "Connect to this server")
     ).get_matches();
 
-    let bind = matches.value_of("bind").unwrap_or(DEFBIND);
-    let tcpserver = matches.value_of("tcp").unwrap_or(DEFTTCP);
+    static ref BIND: &'static str = (*M).value_of("bind").unwrap_or(DEFBIND);
+    static ref TCPSERVER: &'static str = (*M).value_of("tcp").unwrap_or(DEFTTCP);
+}
 
-    run_server(bind, tcpserver).or_else(|err| println!("{}", err.description()));
+fn main() {
+    run_server(*BIND).unwrap_or_else(|err| err.pretty_print());
+}
+
+
+#[get("/")]
+fn proxify() -> &'static str {
+    *TCPSERVER
+}
+
+fn run_server(b: &str) -> Result<(), ConfigError> {
+    let bv: Vec<&str> = b.split(":").collect();
+    let addr = bv[0].to_owned();
+    let port = bv[1].parse::<usize>().unwrap_or(DEFPORT);
+
+    let config = Config::default_for(Environment::active()?, "custom")
+        ?
+        .address(addr)
+        .port(port);
+
+    rocket::custom(&config).mount("/", routes![proxify]).launch();
+
+    Ok(())
 }

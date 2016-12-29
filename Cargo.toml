@@ -7,3 +7,6 @@ authors = ["Nurahmadie <nurahmadie@gmail.com>"]
 clap = "2.19.2"
 rocket = "0.1.2"
 rocket_codegen = "0.1.2"
+
+[dependencies.lazy_static]
+git = "https://github.com/rust-lang-nursery/lazy-static.rs"
