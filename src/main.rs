@@ -9,7 +9,11 @@ extern crate lazy_static;
 
 extern crate rocket;
 
+use std::io::prelude::*;
+use std::net::TcpStream;
+use std::time::Duration;
 use rocket::config::{Config, ConfigError, Environment};
+use rocket::response::content::JSON;
 
 static DEFPORT: usize = 32223;
 static DEFBIND: &'static str = "127.0.0.1:32223";
@@ -19,7 +23,7 @@ lazy_static! {
     static ref M: clap::ArgMatches<'static> = clap_app!(Httcp =>
         (version: "0.1.0")
         (author: "Nurahmadie <nurahmadie@gmail.com>")
-        (about: "Proxy TCP server with http frontend")
+        (about: "Proxy TCP server with HTTP frontend")
         (@arg bind: -b --bind +takes_value "Bind to this address")
         (@arg tcp: -t --tcpserver +takes_value "Connect to this server")
     ).get_matches();
@@ -28,14 +32,36 @@ lazy_static! {
     static ref TCPSERVER: &'static str = (*M).value_of("tcp").unwrap_or(DEFTTCP);
 }
 
+
 fn main() {
     run_server(*BIND).unwrap_or_else(|err| err.pretty_print());
 }
 
 
-#[get("/")]
-fn proxify() -> &'static str {
-    *TCPSERVER
+macro_rules! try_maybe {
+	($expr:expr) => (match $expr {
+		Ok(val) => val,
+		Err(err) => {
+			return JSON(format!("{:?}", err));
+		}
+	})
+}
+
+#[get("/nc_stats")]
+fn proxify() -> JSON<String> {
+    let rconn = TcpStream::connect(*TCPSERVER);
+    match rconn {
+        Ok(stream) => {
+            let mut buff = String::new();
+            let mut input = try_maybe!(stream.try_clone());
+            try_maybe!(input.set_read_timeout(Some(Duration::new(5, 0))));
+            try_maybe!(input.read_to_string(&mut buff));
+            JSON(buff)
+        }
+        Err(err) => {
+            JSON(format!("{:?}", err))
+        }
+    }
 }
 
 fn run_server(b: &str) -> Result<(), ConfigError> {
